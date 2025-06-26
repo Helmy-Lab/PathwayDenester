@@ -12,6 +12,7 @@ This is achieved by testing each pathway (A) with each of the other pathways wit
 Created and tested using version Python 3.11.5.
 
 Reqquires python to run, can be run using command line arguments:
+```
 usage: public_pathwaydenester_v3.2.py [-h] [--output_address [output_address]] [--to_test_threshold TO_TEST_THRESHOLD] [--pval_treshold PVAL_TRESHOLD]
                                       [--tranlator_gene_names [TRANLATOR_GENE_NAMES]]
                                       [paths_address] [gmt_address]
@@ -36,6 +37,7 @@ options:
   --tranlator_gene_names [TRANLATOR_GENE_NAMES]
                         If you add a file that can translate the IDs used in gmt files to another name I can translate the genes list of each pathway. Argument are 3 comma separated
                         strings; translator file address, colname of IDs, colname of translated names
+```
 
 Example using results from gProfiler:
 To run PathwayDenester you need a pathway enrichment analysis result and the GMT file that created it.
