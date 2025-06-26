@@ -10,10 +10,10 @@ from fractions import Fraction
 
 parser = argparse.ArgumentParser(description="Look for pathways that are found only because of another more significant one")
 
-parser.add_argument('pathway_list', metavar='paths_address', type=str, nargs='?', required=True,
+parser.add_argument('pathway_list', metavar='paths_address', type=str, nargs='?',
                     help='TSV result from pathways analysis like gplofiler, just columns \"term_id\" - Pathway ID as in the GMT file;  \"term_name\" - Pathway Name, aesthetic only.; \"intersection_size\"  (optional), \"term_size\"  (optional), and \"p_value\" - From pathway enrichment, used for sorting pathways.; \"intersection\" (optional): List of gene IDs differentially expressed in pathway, separated by \",\".') 
 
-parser.add_argument('gmt_file', metavar='gmt_address', type=str, nargs='?',required=True,
+parser.add_argument('gmt_file', metavar='gmt_address', type=str, nargs='?',
                     help='GMT file with all pathways, will be used to find which genes are in each enriched pathway')
 
 parser.add_argument('--output_address', metavar='output_address', type=str,  nargs='?', default='',
@@ -59,66 +59,66 @@ if output_address == '':
 # This funtion is similar to panda's read_table(), but it returns a dictionary indexed by values from column dict_key. Synonyms are appended to a list.
 # This function is larger as it performs some data cleaning.
 def read_file(address, skiprows = 0, colorder = [], minlength = 2, dict_key = 0, coment_line_char = '#', sep = '\t'):
-	dict_key_int = True
-	if(str(type(dict_key)) == "<class 'int'>"):
-		dict_key_int = True
-	elif(str(type(dict_key)) == "<class 'list'>"):
-		dict_key_int = False
-	else:
-		print('Error: type([dict_key]) must be \'list\' or \'int\', is: ' + str(type([dict_key])))
-	colorder_int = True
-	if(str(type(colorder)) == "<class 'int'>"):
-		colorder_int = True
-	elif(str(type(colorder)) == "<class 'list'>"):
-		colorder_int = False
-	else:
-		print('Error: type([dict_key]) must be \'list\' or \'int\', is: ' + str(type([colorder])))
+    dict_key_int = True
+    if(str(type(dict_key)) == "<class 'int'>"):
+        dict_key_int = True
+    elif(str(type(dict_key)) == "<class 'list'>"):
+        dict_key_int = False
+    else:
+        print('Error: type([dict_key]) must be \'list\' or \'int\', is: ' + str(type([dict_key])))
+    colorder_int = True
+    if(str(type(colorder)) == "<class 'int'>"):
+        colorder_int = True
+    elif(str(type(colorder)) == "<class 'list'>"):
+        colorder_int = False
+    else:
+        print('Error: type([dict_key]) must be \'list\' or \'int\', is: ' + str(type([colorder])))
 
-	end_of_line = 1  #will be used in an if several lines bellow.
-	table = {}
+    end_of_line = 1  #will be used in an if several lines bellow.
+    table = {}
 
-	#if file is .gz
-	if(address[-3:] == '.gz'):  #not working properly!
+    #if file is .gz
+    if(address[-3:] == '.gz'):  #not working properly!
 
-		fil = cmdline('zcat ' + address).split('\n')
-	else:
-		fil = open(address, 'r')
-	for line in fil:
-		if(skiprows!= 0): #skip headers
-			skiprows += -1
-		else:
-			if(end_of_line == 1):
-				if(line[-2] == '\r'):
-					end_of_line = -2  # \r\n
-				elif(line[-1] == '\n'):
-					end_of_line = -1  # \n
-				else:
-					end_of_line = 0  #will happen if file is .gz, but the zcat might not be working
-			if (minlength < len(line)):  # taking empty lines out
-				if (line[0] != coment_line_char):  # taking commented lines out
-					splitted = line[:end_of_line].split(sep)  # taking out the '\n'
-					vector = []
-					if(colorder_int):
-						i = colorder
-						if(len(splitted) <= i):
-							print('Error on file ' + address + ' splitted len <= ' + str(i))
-							print(splitted)
+        fil = cmdline('zcat ' + address).split('\n')
+    else:
+        fil = open(address, 'r')
+    for line in fil:
+        if(skiprows!= 0): #skip headers
+            skiprows += -1
+        else:
+            if(end_of_line == 1):
+                if(line[-2] == '\r'):
+                    end_of_line = -2  # \r\n
+                elif(line[-1] == '\n'):
+                    end_of_line = -1  # \n
+                else:
+                    end_of_line = 0  #will happen if file is .gz, but the zcat might not be working
+            if (minlength < len(line)):  # taking empty lines out
+                if (line[0] != coment_line_char):  # taking commented lines out
+                    splitted = line[:end_of_line].split(sep)  # taking out the '\n'
+                    vector = []
+                    if(colorder_int):
+                        i = colorder
+                        if(len(splitted) <= i):
+                            print('Error on file ' + address + ' splitted len <= ' + str(i))
+                            print(splitted)
                         if(dict_key_int):
                             append_dict(table, splitted[dict_key], splitted[i])
                         else:
                             append_dict(table, sep.join([splitted[j] for j in dict_key]), splitted[i])
-					else:
-						if(colorder != []):
-							for i in colorder:
-								if(len(splitted) <= i):
-									print('Error on file ' + address + ' splitted len <= ' + str(i))
-									print(splitted)
-								vector.append(splitted[i])
+                    else:
+                        if(colorder != []):
+                            for i in colorder:
+                                if(len(splitted) <= i):
+                                    print('Error on file ' + address + ' splitted len <= ' + str(i))
+                                    print(splitted)
+                                vector.append(splitted[i])
                             if(dict_key_int):
                                 append_dict(table, splitted[dict_key], vector)
                             else:
                                 append_dict(table, sep.join([splitted[j] for j in dict_key]), vector)
-						else:
+                        else:
                             if(dict_key_int):
                                 for i in range(len(splitted)):
                                     #if(i != dict_key):  #comment this if you want the keys to be redundantly included in the vector
@@ -129,9 +129,9 @@ def read_file(address, skiprows = 0, colorder = [], minlength = 2, dict_key = 0,
                                     #if(i not in dict_key): #comment this if you want the keys to be redundantly included in the vector
                                     vector.append(splitted[i])
                                 append_dict(table, sep.join([splitted[j] for j in dict_key]), vector)
-	if(address[-3:] != '.gz'):
-		fil.close()
-	return (table)
+    if(address[-3:] != '.gz'):
+        fil.close()
+    return (table)
 
 def comb(n, k):
     if(k > n):
@@ -315,6 +315,4 @@ for line in range(0, len(pathways_dictionaries)):
 
 out_file.close()
 
-print('done')
-
-
+print('PathwayDenester done')
