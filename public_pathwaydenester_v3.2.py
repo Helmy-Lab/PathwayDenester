@@ -8,7 +8,7 @@ import time
 import warnings
 from fractions import Fraction
 
-parser = argparse.ArgumentParser(description="Look for pathways that are found only because of another more significant one")
+parser = argparse.ArgumentParser(description="Look for pathways that are found only because of another more significant one:")
 
 parser.add_argument('pathway_list', metavar='paths_address', type=str, nargs='?',
                     help='TSV result from pathways analysis like gplofiler, just columns \"term_id\" - Pathway ID as in the GMT file;  \"term_name\" - Pathway Name, aesthetic only.; \"intersection_size\"  (optional), \"term_size\"  (optional), and \"p_value\" - From pathway enrichment, used for sorting pathways.; \"intersection\" (optional): List of gene IDs differentially expressed in pathway, separated by \",\".') 
@@ -40,7 +40,7 @@ pval_treshold = float(args.pval_treshold)  # to change result from "keep" to "ex
 tranlator_gene_names = args.tranlator_gene_names
 
 
-version = '3.2'
+version = '3.3'
 #v2 I format the script neatly as a function
 #v2.1 minor comments
 #v2.4 adjusted identation, added a "filter" column to give more info on near misses
@@ -52,6 +52,7 @@ version = '3.2'
 #v2.9 deals with differences in p-value cutoffs, and splits the filter column into filter and reciprocal. Column order was rearranged
 #v3 uses from fractions import Fraction
 #v3.2 changes default to_test_threshold to 0. Fix strange case where there are p-value ties in the enriched input. Solve ties by density then number of degs
+#v 3.3 accepts csv again
 
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
@@ -160,9 +161,14 @@ for pathway in gmt_data:
 
 
 
-if pathway_list.split('.')[-1]  != 'tsv':
+if pathway_list.split('.')[-1] == 'tsv':
+    input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = '\t')
+else if pathway_list.split('.')[-1] == 'csv':
+    input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = ',')
+else:
     warnings.warn('PathwayDenester expects a tab separated file containing at leats the following columns:  \"term_id\", \"term_name\", \"intersection_size\", \"term_size\", and \"p_value\"')
-input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = '\t')
+    input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = '\t')
+
 ####### Sort pathways in input file; by p-value, by density in case of tie, by number of degs in case of tie
 #kind='stable' preserves order in case of ties
 #sort by number of degs
