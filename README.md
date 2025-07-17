@@ -42,7 +42,7 @@ options:
 Example using results from gProfiler:
 To run PathwayDenester you need a pathway enrichment analysis result and the GMT file that created it.
 In <https://biit.cs.ut.ee/gprofiler/gost> you can click in "random example", then "Run query", click on the "Detail results" tab, and download the csv file.
-The GMT file can be downloaded from the "Data sources" dropdown menu (combined name.gmt).
+The GMT file can be downloaded from the "Data sources" dropdown menu (combined ENSG.gmt).
 
 Then run on terminal:
 
