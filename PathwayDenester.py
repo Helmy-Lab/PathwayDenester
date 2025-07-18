@@ -28,7 +28,13 @@ parser.add_argument('--tranlator_gene_names', type=str, nargs='?', default='',
                     help='If you add a file that can translate the IDs used in gmt files to another name I can translate the genes list of each pathway. Argument are 3 comma separated strings; translator file address, colname of IDs, colname of translated names')
 
 args = parser.parse_args()
-
+print(args)
+if (args.pathway_list == None and args.gmt_file == None):
+    sys.exit('error; no input files, type "--help" to see the manual\n')
+if (args.pathway_list == None):
+    sys.exit('error; no input enrichment results, type "--help" to see the manual\n')
+if (args.gmt_file == None):
+    sys.exit('error; no pathway reference file, type "--help" to see the manual\n')
 
 # Will transfer all arguments here for code clarity:
 pathway_list = args.pathway_list
@@ -39,7 +45,7 @@ pval_treshold = float(args.pval_treshold)  # to change result from "keep" to "ex
 tranlator_gene_names = args.tranlator_gene_names
 
 
-version = '3.3'
+version = '3.4'
 #v2 I format the script neatly as a function
 #v2.1 minor comments
 #v2.4 adjusted identation, added a "filter" column to give more info on near misses
@@ -52,6 +58,7 @@ version = '3.3'
 #v3 uses from fractions import Fraction
 #v3.2 changes default to_test_threshold to 0. Fix strange case where there are p-value ties in the enriched input. Solve ties by density then number of degs
 #v 3.3 accepts csv again
+#v3.4 improves error messages and warnings
 
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
@@ -216,9 +223,9 @@ for index, path in approved_pathways.iterrows():
     path_id = path.term_id
     pathaway_data = gmt_data[path_id][0]  #I need to know its composition to find the intersection size of the pathways
     path_slice = approved_pathways[approved_pathways.term_id == path_id].iloc[0]
-    ratio_of_unexpected_DEGs = float(len(set(path_slice.intersection.split(spliting_string)) - set(pathaway_data[2:])))/len(pathaway_data[2:])
+    ratio_of_unexpected_DEGs = round(float(len(set(path_slice.intersection.split(spliting_string)) - set(pathaway_data[2:])))/len(path_slice.intersection.split(spliting_string)), 3)
     if (ratio_of_unexpected_DEGs > 0.1):   #hard coded; threshold to eliminate pathways where a high fraction of its DEGs not in the original gmt file
-        print(path_id + ' has a high fraction of its DEGs not in the original gmt file: ' + str(ratio_of_unexpected_DEGs))
+        print(path_id + ' has a high fraction of its DEGs not in the original gmt file: ' + str(ratio_of_unexpected_DEGs*100)+'%')
     else:
         approved_degs = [i for i in path_slice.intersection.split(spliting_string) if i in set(pathaway_data[2:])]
         pathways_dictionaries[path_rank] = {'id': path_id, 'name': path_slice.term_name, 'p-value': path_slice.p_value, 'all_genes': set(pathaway_data[2:]), 'deg_list': approved_degs, 'density' : float(len(approved_degs))/len(set(pathaway_data[2:]))}
