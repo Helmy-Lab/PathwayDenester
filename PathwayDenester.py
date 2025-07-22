@@ -1,5 +1,6 @@
 import sys
 import os
+import io
 import numpy as np
 import pandas as pd
 import math
@@ -14,6 +15,9 @@ parser.add_argument('pathway_list', metavar='paths_address', type=str, nargs='?'
 
 parser.add_argument('gmt_file', metavar='gmt_address', type=str, nargs='?',
                     help='GMT file with all pathways, will be used to find which genes are in each enriched pathway')
+
+parser.add_argument('--selected_gene_list', metavar='selected_gene_list', type=str, nargs='?', default='',
+                    help='Alternatively, if your pathway list doesn\'t show the genes that enrich each pathway, a separate list of genes can be inputed. Those will be comparaed to the gmt file to estimate which pathway they are associated with. This is LESS accurate as it might miss other parameters that might have been involved on the processed that created the pathway list. Only first column will be read, accepts the same nomenclaure used in the gmt file. Please remove genes that are not significant beforehand.') 
 
 parser.add_argument('--output_address', metavar='output_address', type=str,  nargs='?', default='',
                     help='TSV file name where results will be saved. Default is pathway_list name  + \'_filtered.tsv\'')
@@ -43,9 +47,9 @@ output_address =  args.output_address
 to_test_threshold =  float(args.to_test_threshold)   #default=0.00
 pval_treshold = float(args.pval_treshold)  # to change result from "keep" to "exclude", default=0.05
 tranlator_gene_names = args.tranlator_gene_names
+selected_gene_list = args.selected_gene_list
 
-
-version = '3.4'
+version = '3.5'
 #v2 I format the script neatly as a function
 #v2.1 minor comments
 #v2.4 adjusted identation, added a "filter" column to give more info on near misses
@@ -59,6 +63,7 @@ version = '3.4'
 #v3.2 changes default to_test_threshold to 0. Fix strange case where there are p-value ties in the enriched input. Solve ties by density then number of degs
 #v 3.3 accepts csv again
 #v3.4 improves error messages and warnings
+#3.5 added utf-8 capabilities in windows, also added optional --selected_gene_list argument
 
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
@@ -70,7 +75,7 @@ def append_dict(dict, name, item):  # add to dictionary, if entry already exists
 	dict[name].append(item)
 
 # This funtion is similar to panda's read_table(), but it returns a dictionary indexed by values from column dict_key. Synonyms are appended to a list.
-# This function is larger as it performs some data cleaning.
+# This function is larger as it performs some data cleaning. # I intend to reduce it in next versions.
 def read_file(address, skiprows = 0, colorder = [], minlength = 2, dict_key = 0, coment_line_char = '#', sep = '\t'):
     dict_key_int = True
     if(str(type(dict_key)) == "<class 'int'>"):
@@ -90,12 +95,8 @@ def read_file(address, skiprows = 0, colorder = [], minlength = 2, dict_key = 0,
     end_of_line = 1  #will be used in an if several lines bellow.
     table = {}
 
-    #if file is .gz
-    if(address[-3:] == '.gz'):  #not working properly!
 
-        fil = cmdline('zcat ' + address).split('\n')
-    else:
-        fil = open(address, 'r')
+    fil = io.open(address, 'r', encoding="utf-8")
     for line in fil:
         if(skiprows!= 0): #skip headers
             skiprows += -1
@@ -176,21 +177,27 @@ if pathway_list.split('.')[-1].lower() == 'tsv':
 elif pathway_list.split('.')[-1].lower() == 'csv':
     input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = ',')
 else:
-    warnings.warn('PathwayDenester expects a tab separated file containing at leats the following columns:  \"term_id\", \"term_name\", \"intersection_size\", \"term_size\", and \"p_value\"')
+    warnings.warn('PathwayDenester expects a tab separated file containing at leats the following columns:  \"term_id\", \"term_name\", and \"p_value\"')
     input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = '\t')
 
 
 ###########
 # adjust some nomenclature inconsistencies from different PEA sources
+#make colun matching easier by converting them all to lowercase
+input_pathways.columns = [colname.lower() for colname in input_pathways.columns]
+#also replace - and space for _
+input_pathways.columns = [colname.replace('-', '_') for colname in input_pathways.columns]
+input_pathways.columns = [colname.replace(' ', '_') for colname in input_pathways.columns]
+
 input_pathways = input_pathways.rename(columns={"intersections": "intersection"})  # won't be a problem if the name was already correct
 input_pathways = input_pathways.rename(columns={"pathway_id": "term_id"})
 input_pathways = input_pathways.rename(columns={"pathway_name": "term_name"})
-input_pathways = input_pathways.rename(columns={"p-value": "p_value"})
 input_pathways = input_pathways.rename(columns={"pvalue": "p_value"})
 if 'p_value' not in input_pathways.columns:
     input_pathways = input_pathways.rename(columns={"adjusted_p_value": "p_value"})  #if there isn't a column called p_value, look for 'adjusted_p_value', they sort ~ the same way
     input_pathways = input_pathways.rename(columns={"adj_p_value": "p_value"})
     input_pathways = input_pathways.rename(columns={"q_value": "p_value"})
+
 
 ####### Sort pathways in input file; by p-value, by density in case of tie, by number of degs in case of tie
 #kind='stable' preserves order in case of ties
@@ -211,6 +218,32 @@ if len(rejected_pathways) > 0:
     print('Warning, These pathways were not in the gmt file:\n' + '\n'.join([line for line in rejected_pathways.term_id]))
 approved_pathways = input_pathways[input_pathways.term_id.isin(gmt_data)]
 del input_pathways
+
+
+#####################
+# Alternatively, if the pathway list doesn't show the genes that enrich each pathway, a separate list of genes can be inputed. Those will be comparaed to the gmt file to figure which pathway they are associated with. This is less accurate as it might miss other parameters that might have been involved on the processed that created the pathway list. Only fist column will be read.
+deg_genes_set = set()
+if ('intersection' not in approved_pathways.columns):
+    if selected_gene_list != '':
+        warnings.warn('No \'intersection\' column found pathway list, using '+selected_gene_list+' to estimate intersections...')
+        gene_list_file = open(selected_gene_list, 'r')
+        for line in gene_list_file:
+            splitted = line[:-1].split('\t')
+            splitted = splitted[0].split(',')  #split by either tab or comma, irrelevant as I will just read the 1st column
+            deg_genes_set.add(splitted[0])
+        gene_list_file.close()
+        approved_pathways["intersection"] = '' #create new empty str() column
+        #now use gmt to pupulate new column
+        for pathway_id in approved_pathways.term_id:
+            approved_pathways.loc[approved_pathways['term_id'] == pathway_id ,'intersection'] = spliting_string.join((deg_genes_set & set(gmt_data[pathway_id][0][2:])))
+        #check for empty intersections:
+        for i in approved_pathways.term_id:
+            if (approved_pathways[approved_pathways['term_id'] == pathway_id]['intersection'] == '').item():  #.item() to extract bool from pandas object
+                warnings.warn('No selected genes found in :'+pathway_id+' pathway will be excluded')
+                approved_pathways = approved_pathways[approved_pathways['term_id'] != pathway_id]  #remove line
+    else:
+        sys.exit('error; \'intersection\' column not found on pathway list file, also no file was provided on --deg_genes_set.\nType "--help" to see the manual\n')
+
 
 #@# In case we don't have a column listing the differentialy expressed genes (DEGs) in each pathway, but have a list of them separately
 #@#pathways_have_independent_cutoffs = True
@@ -250,7 +283,7 @@ if tranlator_gene_names != '':
     splitted = tranlator_gene_names.split(',')
     if len(splitted) != 3:
         sys.exit('error, tranlator_gene_names should be 3 commaseparated values, example:\n\tfile.tsv,gene_id,gene_name\nHow I reveived it :\n\t' + tranlator_gene_names + '\n')
-    gene_translator_file = open(splitted[0], 'r')
+    gene_translator_file = io.open(splitted[0], 'r', encoding="utf-8")
     header = gene_translator_file.readline()[:-1]
     header_split = header.split('\t')
     if (splitted[1] in header_split) and (splitted[2] in header_split):
@@ -338,7 +371,7 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
 
 #############
 #save results:
-out_file = open(output_address, 'w')
+out_file = io.open(output_address, 'w', encoding="utf-8")
 out_file.write('pathway id\tname\tpvalue\tDEG Density\tresult\treciprocal\tfiltered\tVersus\tVersusName\ttop10 genes\n')
 #out_file.write('\t'.join([pathways_dictionaries[0]['id'], pathways_dictionaries[0]['name'], str(pathways_dictionaries[0]['p-value']), '2', 'best']) + '\n') #print line one
 for line in range(0, len(pathways_dictionaries)):
