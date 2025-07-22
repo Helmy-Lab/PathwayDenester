@@ -219,6 +219,7 @@ if len(rejected_pathways) > 0:
 approved_pathways = input_pathways[input_pathways.term_id.isin(gmt_data)]
 del input_pathways
 
+spliting_string = ','  #hard coded  #how are the DEGs separated in referencre gmt
 
 #####################
 # Alternatively, if the pathway list doesn't show the genes that enrich each pathway, a separate list of genes can be inputed. Those will be comparaed to the gmt file to figure which pathway they are associated with. This is less accurate as it might miss other parameters that might have been involved on the processed that created the pathway list. Only fist column will be read.
@@ -248,7 +249,7 @@ if ('intersection' not in approved_pathways.columns):
 #@# In case we don't have a column listing the differentialy expressed genes (DEGs) in each pathway, but have a list of them separately
 #@#pathways_have_independent_cutoffs = True
 
-spliting_string = ','  #hard coded  #how are the DEGs separated in referencre gmt
+
 pathways_dictionaries = [{} for a in approved_pathways.iterrows()]
 path_rank = 0
 #load genes in pathway dictionary
