@@ -198,6 +198,10 @@ if 'p_value' not in input_pathways.columns:
     input_pathways = input_pathways.rename(columns={"adj_p_value": "p_value"})
     input_pathways = input_pathways.rename(columns={"q_value": "p_value"})
 
+required_columns = ['term_id', 'term_name', 'p_value']
+if not all(col in input_pathways.columns for col in required_columns):
+    missing = [col for col in required_columns if col not in input_pathways.columns]
+    sys.exit("error; "+str(missing)+" columns not found from pathway file.")
 
 ####### Sort pathways in input file; by p-value, by density in case of tie, by number of degs in case of tie
 #kind='stable' preserves order in case of ties
@@ -243,7 +247,7 @@ if ('intersection' not in approved_pathways.columns):
                 warnings.warn('No selected genes found in :'+pathway_id+' pathway will be excluded')
                 approved_pathways = approved_pathways[approved_pathways['term_id'] != pathway_id]  #remove line
     else:
-        sys.exit('error; \'intersection\' column not found on pathway list file, also no file was provided on --deg_genes_set.\nType "--help" to see the manual\n')
+        sys.exit('error; \'intersection\' column not found on pathway list file, also no file was provided on --selected_gene_list.\nType "--help" to see the manual\n')
 
 
 #@# In case we don't have a column listing the differentialy expressed genes (DEGs) in each pathway, but have a list of them separately
