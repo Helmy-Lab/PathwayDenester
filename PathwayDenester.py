@@ -28,6 +28,9 @@ parser.add_argument('--to_test_threshold', type=float, default='0',
 parser.add_argument('--pval_treshold', type=float, default='0.05',
                     help='P-value thresold to exclude a pathway. Since each pathway is treated independently, multiple testing corrections shouldn\'t be applied.')
 
+parser.add_argument('--term_size_limit', type=float, default='0',
+                    help='Ignore very large pathways largers than term_size_limit. Use this if you want to remove vague terms likes \'Cytoplasm\'.')
+
 parser.add_argument('--tranlator_gene_names', type=str, nargs='?', default='',
                     help='If you add a file that can translate the IDs used in gmt files to another name I can translate the genes list of each pathway. Argument are 3 comma separated strings; translator file address, colname of IDs, colname of translated names')
 
@@ -48,8 +51,9 @@ to_test_threshold =  float(args.to_test_threshold)   #default=0.00
 pval_treshold = float(args.pval_treshold)  # to change result from "keep" to "exclude", default=0.05
 tranlator_gene_names = args.tranlator_gene_names
 selected_gene_list = args.selected_gene_list
+term_size_limit = args.term_size_limit
 
-version = '3.5'
+version = '3.6'
 #v2 I format the script neatly as a function
 #v2.1 minor comments
 #v2.4 adjusted identation, added a "filter" column to give more info on near misses
@@ -64,6 +68,7 @@ version = '3.5'
 #v 3.3 accepts csv again
 #v3.4 improves error messages and warnings
 #3.5 added utf-8 capabilities in windows, also added optional --selected_gene_list argument
+#3.6 adds intersection_size to output and allows for filtering input term_size
 
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
@@ -179,6 +184,7 @@ elif pathway_list.split('.')[-1].lower() == 'csv':
 else:
     warnings.warn('PathwayDenester expects a tab separated file containing at leats the following columns:  \"term_id\", \"term_name\", and \"p_value\"')
     input_pathways = pd.read_csv(pathway_list, quotechar='\"', quoting = 0, sep = '\t')
+    
 
 
 ###########
@@ -203,6 +209,7 @@ if not all(col in input_pathways.columns for col in required_columns):
     missing = [col for col in required_columns if col not in input_pathways.columns]
     sys.exit("error; "+str(missing)+" columns not found from pathway file.")
 
+
 ####### Sort pathways in input file; by p-value, by density in case of tie, by number of degs in case of tie
 #kind='stable' preserves order in case of ties
 #sort by number of degs
@@ -213,7 +220,6 @@ if 'intersection_size' in input_pathways.columns:
         input_pathways = input_pathways.sort_values(by='ratio', ascending=False, kind='stable')
 input_pathways = input_pathways.sort_values(by='p_value', ascending=True, kind='stable')  #this one is required! Pathways will only be tested against those above them
 
-        
 
 
 
@@ -222,6 +228,14 @@ if len(rejected_pathways) > 0:
     print('Warning, These pathways were not in the gmt file:\n' + '\n'.join([line for line in rejected_pathways.term_id]))
 approved_pathways = input_pathways[input_pathways.term_id.isin(gmt_data)]
 del input_pathways
+
+# if necessary, filter out large pathways by term_size
+if term_size_limit != 0:
+    for index, path in approved_pathways.iterrows():
+        print(len(gmt_data[path.term_id][0]))
+        if len(gmt_data[path.term_id][0]) > term_size_limit:
+            approved_pathways.drop(index, inplace=True)
+
 
 spliting_string = ','  #hard coded  #how are the DEGs separated in referencre gmt
 
@@ -377,10 +391,10 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
 #############
 #save results:
 out_file = io.open(output_address, 'w', encoding="utf-8")
-out_file.write('pathway id\tname\tpvalue\tDEG Density\tresult\treciprocal\tfiltered\tVersus\tVersusName\ttop10 genes\n')
+out_file.write('pathway id\tname\tpvalue\tDEG number\tDEG Density\tresult\treciprocal\tfiltered\tVersus\tVersusName\ttop10 genes\n')
 #out_file.write('\t'.join([pathways_dictionaries[0]['id'], pathways_dictionaries[0]['name'], str(pathways_dictionaries[0]['p-value']), '2', 'best']) + '\n') #print line one
 for line in range(0, len(pathways_dictionaries)):
-    out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(round(pathways_dictionaries[line]['density'], 5)),  f"{pathways_dictionaries[line]['result']:.4g}", f"{pathways_dictionaries[line]['reciprocal']:.4g}" , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top10'])]) + '\n')
+    out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), str(round(pathways_dictionaries[line]['density'], 5)),  f"{pathways_dictionaries[line]['result']:.4g}", f"{pathways_dictionaries[line]['reciprocal']:.4g}" , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top10'])]) + '\n')
 
 out_file.close()
 
