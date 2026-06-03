@@ -410,18 +410,21 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
 #save results:
 out_file = io.open(output_address, 'w', encoding="utf-8")
 if top_n != 0:
-    out_file.write('pathway id\tname\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in intersection\tresult\treciprocal\tfiltered\tVersus\tVersusName\ttop genes\n')
+    out_file.write('Pathway id\tName\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in Intersection\tResult\tReciprocal pvalue\tFiltered\tVersus\tVersus Name\tIs Reciprocal\tTop Genes\n')
 else:
-    out_file.write('pathway id\tname\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in intersection\tresult\treciprocal\tfiltered\tVersus\tVersusName\n')
+    out_file.write('Pathway id\tName\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in Intersection\tResult\tReciprocal pvalue\tFiltered\tVersus\tVersus Name\tIs Reciprocal\n')
 
 for line in range(0, len(pathways_dictionaries)):
     if(pathways_dictionaries[line]['filter'] != 'exclude' or show_excluded):
-        out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), 
-                      nice_float(pathways_dictionaries[line]['density']), str(pathways_dictionaries[line]['intersection_size']), str(pathways_dictionaries[line]['degs_in_intersection']),  nice_float(pathways_dictionaries[line]['result']),
-                      nice_float(pathways_dictionaries[line]['reciprocal']) , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top_n'])]) + '\n')
+        if (pathways_dictionaries[line]['reciprocal'] < pval_treshold) and (pathways_dictionaries[line]['p-value'] < pval_treshold):
+            reciprocal_final = 'True'
+        else:
+            reciprocal_final = 'False'
+        if top_n != 0:
+            out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], nice_float(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), nice_float(pathways_dictionaries[line]['density']), str(pathways_dictionaries[line]['intersection_size']), str(pathways_dictionaries[line]['degs_in_intersection']),  nice_float(pathways_dictionaries[line]['result']), nice_float(pathways_dictionaries[line]['reciprocal']) , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], reciprocal_final, ','.join(pathways_dictionaries[line]['top_n'])]) + '\n')
+        else:
+            out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], nice_float(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), nice_float(pathways_dictionaries[line]['density']), str(pathways_dictionaries[line]['intersection_size']), str(pathways_dictionaries[line]['degs_in_intersection']),  nice_float(pathways_dictionaries[line]['result']), nice_float(pathways_dictionaries[line]['reciprocal']) , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], reciprocal_final])  + '\n')
 
 out_file.close()
 
-
-
-
+print('PathwayDenester done')
