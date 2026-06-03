@@ -84,9 +84,9 @@ if output_address == '':
 
 
 def append_dict(dict, name, item):  # add to dictionary, if entry already exists, vector-append to it instead of replacing
-	if name not in dict:
-		dict[name] = []
-	dict[name].append(item)
+    if name not in dict:
+        dict[name] = []
+    dict[name].append(item)
 
 # This funtion is similar to panda's read_table(), but it returns a dictionary indexed by values from column dict_key. Synonyms are appended to a list.
 # This function is larger as it performs some data cleaning. # I intend to reduce it in next versions.
@@ -305,8 +305,8 @@ for line in range(len(pathways_dictionaries)):
     pathways_dictionaries[line]['degs'] = set(pathways_dictionaries[line]['deg_list'])
     pathways_dictionaries[line]['all_genes'] = set(pathways_dictionaries[line]['all_genes'])
     pathways_dictionaries[line]['reciprocal'] = 0
-	pathways_dictionaries[line]['intersection_size'] = 0
-	pathways_dictionaries[line]['degs_in_intersection'] = 0
+    pathways_dictionaries[line]['intersection_size'] = 0
+    pathways_dictionaries[line]['degs_in_intersection'] = 0
 
 
 if tranlator_gene_names != '':
@@ -377,7 +377,7 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
                         pathways_dictionaries[current_line]['filter'] = 'exclude'
                         pathways_dictionaries[current_line]['vs'] = pathways_dictionaries[test_line]['id']
                         pathways_dictionaries[current_line]['vsName'] = pathways_dictionaries[test_line]['name']
-						pathways_dictionaries[current_line]['intersection_size'] = intersection_size
+                        pathways_dictionaries[current_line]['intersection_size'] = intersection_size
                         pathways_dictionaries[current_line]['degs_in_intersection'] = degs_in_intersection_current
                         break
                 if current_result < pathways_dictionaries[current_line]['result']:
