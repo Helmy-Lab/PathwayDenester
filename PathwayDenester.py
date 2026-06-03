@@ -34,6 +34,12 @@ parser.add_argument('--term_size_limit', type=float, default='0',
 parser.add_argument('--tranlator_gene_names', type=str, nargs='?', default='',
                     help='If you add a file that can translate the IDs used in gmt files to another name I can translate the genes list of each pathway. Argument are 3 comma separated strings; translator file address, colname of IDs, colname of translated names')
 
+parser.add_argument('--top_n', type=int, default='-1',
+                    help='Output file shows the N most significant genes in each pathway. Default is 10, 0 omits column, -1 shows all genes.')
+
+parser.add_argument('--clean', action='store_true',
+                    help='Omit \"exclude\" lines from output')
+
 args = parser.parse_args()
 print(args)
 if (args.pathway_list == None and args.gmt_file == None):
@@ -51,9 +57,11 @@ to_test_threshold =  float(args.to_test_threshold)   #default=0.00
 pval_treshold = float(args.pval_treshold)  # to change result from "keep" to "exclude", default=0.05
 tranlator_gene_names = args.tranlator_gene_names
 selected_gene_list = args.selected_gene_list
-term_size_limit = args.term_size_limit
+term_size_limit = int(args.term_size_limit)
 
-version = '3.6'
+version = '3.7'
+
+### Changelog:
 #v2 I format the script neatly as a function
 #v2.1 minor comments
 #v2.4 adjusted identation, added a "filter" column to give more info on near misses
@@ -65,10 +73,11 @@ version = '3.6'
 #v2.9 deals with differences in p-value cutoffs, and splits the filter column into filter and reciprocal. Column order was rearranged
 #v3 uses from fractions import Fraction
 #v3.2 changes default to_test_threshold to 0. Fix strange case where there are p-value ties in the enriched input. Solve ties by density then number of degs
-#v 3.3 accepts csv again
+#v3.3 accepts csv again
 #v3.4 improves error messages and warnings
 #3.5 added utf-8 capabilities in windows, also added optional --selected_gene_list argument
 #3.6 adds intersection_size to output and allows for filtering input term_size
+#3.7 adds more columns to output and adds the parameter top_n
 
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
@@ -218,8 +227,7 @@ if 'intersection_size' in input_pathways.columns:
     if 'term_size' in input_pathways.columns:
         input_pathways["ratio"] = (input_pathways["intersection_size"] / input_pathways["term_size"])
         input_pathways = input_pathways.sort_values(by='ratio', ascending=False, kind='stable')
-input_pathways = input_pathways.sort_values(by='p_value', ascending=True, kind='stable')  #this one is required! Pathways will only be tested against those above them
-
+input_pathways = input_pathways.sort_values(by='p_value', ascending=True, kind='stable')  #this one is always required! Pathways will only be tested against those above them
 
 
 
@@ -232,7 +240,6 @@ del input_pathways
 # if necessary, filter out large pathways by term_size
 if term_size_limit != 0:
     for index, path in approved_pathways.iterrows():
-        print(len(gmt_data[path.term_id][0]))
         if len(gmt_data[path.term_id][0]) > term_size_limit:
             approved_pathways.drop(index, inplace=True)
 
@@ -291,10 +298,15 @@ for line in range(len(pathways_dictionaries)):
     pathways_dictionaries[line]['filter'] = 'keep'
     pathways_dictionaries[line]['vs'] = 'itself'
     pathways_dictionaries[line]['vsName'] = ''
-    pathways_dictionaries[line]['top10'] = pathways_dictionaries[line]['deg_list'][0:10]
+    if top_n < 0:
+        pathways_dictionaries[line]['top_n'] = pathways_dictionaries[line]['deg_list'][0:]
+    else:
+        pathways_dictionaries[line]['top_n'] = pathways_dictionaries[line]['deg_list'][0:top_n]
     pathways_dictionaries[line]['degs'] = set(pathways_dictionaries[line]['deg_list'])
     pathways_dictionaries[line]['all_genes'] = set(pathways_dictionaries[line]['all_genes'])
-    pathways_dictionaries[line]['reciprocal'] = 1
+    pathways_dictionaries[line]['reciprocal'] = 0
+	pathways_dictionaries[line]['intersection_size'] = 0
+	pathways_dictionaries[line]['degs_in_intersection'] = 0
 
 
 if tranlator_gene_names != '':
@@ -322,10 +334,10 @@ if tranlator_gene_names != '':
     gene_translator_file.close()
     gene_translator = read_file(splitted[0], skiprows = 1, colorder = col_to_position, minlength = 2, dict_key = col_from_position, coment_line_char = '', sep = split_char)
     for line in range(len(pathways_dictionaries)):
-        new_top_10 = []
-        for gene_id in pathways_dictionaries[line]['top10']:
-            new_top_10.append(gene_translator[gene_id][0])
-        pathways_dictionaries[line]['top10'] = new_top_10
+        new_top_n = []
+        for gene_id in pathways_dictionaries[line]['top_n']:
+            new_top_n.append(gene_translator[gene_id][0])
+        pathways_dictionaries[line]['top_n'] = new_top_n
 
 
 
@@ -365,6 +377,8 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
                         pathways_dictionaries[current_line]['filter'] = 'exclude'
                         pathways_dictionaries[current_line]['vs'] = pathways_dictionaries[test_line]['id']
                         pathways_dictionaries[current_line]['vsName'] = pathways_dictionaries[test_line]['name']
+						pathways_dictionaries[current_line]['intersection_size'] = intersection_size
+                        pathways_dictionaries[current_line]['degs_in_intersection'] = degs_in_intersection_current
                         break
                 if current_result < pathways_dictionaries[current_line]['result']:
                     ############################
@@ -374,30 +388,24 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
                         pathways_dictionaries[current_line]['vsName'] = pathways_dictionaries[test_line]['name']
                         pathways_dictionaries[current_line]['result'] = current_result
                         pathways_dictionaries[current_line]['reciprocal'] = reverse_result
-                #########
-                #if testing:
-                #    print('line ' + str(current_line) + ': ' + str(time.time() - start))
-                #    if degs_in_intersection_test != degs_in_intersection_current:
-                #        different_cutoffs[0].append(current_line)
-                #        different_cutoffs[1].append(test_line)
-                #    if intersection_size ==  len(pathways_dictionaries[current_line]['all_genes']):  #if pathways are fully nested
-                #        reverse_result = comb_comb_comb(degs_in_test, degs_in_intersection_current, intersection_size, size_test)
-                #        fully_nested_pairs[0].append(pathways_dictionaries[test_line])
-                #        fully_nested_pairs[1].append(pathways_dictionaries[current_line])
-                #        fully_nested_pairs[2].append([test_line, size_test, degs_in_test, current_line, size_current, degs_in_current, intersection_size, degs_in_intersection_current, current_result, reverse_result, ((degs_in_current/size_current) > (degs_in_test/size_test))])
-
+                        pathways_dictionaries[current_line]['intersection_size'] = intersection_size
+                        pathways_dictionaries[current_line]['degs_in_intersection'] = degs_in_intersection_current
 
 
 #############
 #save results:
 out_file = io.open(output_address, 'w', encoding="utf-8")
-out_file.write('pathway id\tname\tpvalue\tDEG number\tDEG Density\tresult\treciprocal\tfiltered\tVersus\tVersusName\ttop10 genes\n')
-#out_file.write('\t'.join([pathways_dictionaries[0]['id'], pathways_dictionaries[0]['name'], str(pathways_dictionaries[0]['p-value']), '2', 'best']) + '\n') #print line one
+if top_n != 0:
+    out_file.write('pathway id\tname\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in intersection\tresult\treciprocal\tfiltered\tVersus\tVersusName\ttop genes\n')
+else:
+    out_file.write('pathway id\tname\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in intersection\tresult\treciprocal\tfiltered\tVersus\tVersusName\n')
+
 for line in range(0, len(pathways_dictionaries)):
-    out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), str(round(pathways_dictionaries[line]['density'], 5)),  f"{pathways_dictionaries[line]['result']:.4g}", f"{pathways_dictionaries[line]['reciprocal']:.4g}" , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top10'])]) + '\n')
+    if(pathways_dictionaries[line]['filter'] != 'exclude' or show_excluded):
+        out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), str(round(pathways_dictionaries[line]['density'], 5)), str(pathways_dictionaries[line]['intersection_size']), str(pathways_dictionaries[line]['degs_in_intersection']),  f"{pathways_dictionaries[line]['result']:.4g}", f"{pathways_dictionaries[line]['reciprocal']:.4g}" , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top_n'])]) + '\n')
 
 out_file.close()
 
-print('PathwayDenester done')
+
 
 
