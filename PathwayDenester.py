@@ -82,6 +82,20 @@ version = '3.7'
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
 
+#format numbers in a reasonable amount of decimals, use scientific notation when convenient.
+def nice_float(num, decimal_places=4, scientific_places=2, scientific_low=0.001, scientific_high=10000000):
+    num = float(num)
+    if num == 0:
+        return "0"
+    elif abs(num) < scientific_low or scientific_high < abs(num):
+        return f"{num:.{scientific_places}e}"
+    else:
+        formatted =  f"{num:.{decimal_places}f}"
+        #
+        # Remove trailing zeros and decimal point if unnecessary
+        if '.' in formatted:
+            formatted = formatted.rstrip('0').rstrip('.')
+        return formatted
 
 def append_dict(dict, name, item):  # add to dictionary, if entry already exists, vector-append to it instead of replacing
     if name not in dict:
@@ -402,7 +416,9 @@ else:
 
 for line in range(0, len(pathways_dictionaries)):
     if(pathways_dictionaries[line]['filter'] != 'exclude' or show_excluded):
-        out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), str(round(pathways_dictionaries[line]['density'], 5)), str(pathways_dictionaries[line]['intersection_size']), str(pathways_dictionaries[line]['degs_in_intersection']),  f"{pathways_dictionaries[line]['result']:.4g}", f"{pathways_dictionaries[line]['reciprocal']:.4g}" , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top_n'])]) + '\n')
+        out_file.write('\t'.join([pathways_dictionaries[line]['id'], pathways_dictionaries[line]['name'], str(pathways_dictionaries[line]['p-value']),  str(len(pathways_dictionaries[line]['degs'])), 
+                      nice_float(pathways_dictionaries[line]['density']), str(pathways_dictionaries[line]['intersection_size']), str(pathways_dictionaries[line]['degs_in_intersection']),  nice_float(pathways_dictionaries[line]['result']),
+                      nice_float(pathways_dictionaries[line]['reciprocal']) , str(pathways_dictionaries[line]['filter']), pathways_dictionaries[line]['vs'], pathways_dictionaries[line]['vsName'], ','.join(pathways_dictionaries[line]['top_n'])]) + '\n')
 
 out_file.close()
 
