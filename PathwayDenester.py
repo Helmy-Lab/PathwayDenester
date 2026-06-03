@@ -17,7 +17,7 @@ parser.add_argument('gmt_file', metavar='gmt_address', type=str, nargs='?',
                     help='GMT file with all pathways, will be used to find which genes are in each enriched pathway')
 
 parser.add_argument('--selected_gene_list', metavar='selected_gene_list', type=str, nargs='?', default='',
-                    help='Alternatively, if your pathway list doesn\'t show the genes that enrich each pathway, a separate list of genes can be inputed. Those will be comparaed to the gmt file to estimate which pathway they are associated with. This is LESS accurate as it might miss other parameters that might have been involved on the processed that created the pathway list. Only first column will be read, accepts the same nomenclaure used in the gmt file. Please remove genes that are not significant beforehand.') 
+                    help='Alternatively, if your pathway list doesn\'t show the genes that enrich each pathway, a separate file with a list of significant genes can be inputed. Those will be comparaed to the gmt file to estimate which pathway they are associated with. This is LESS accurate as it might miss other parameters that might have been involved on the processes that created the pathway list. Only first column will be read, accepts the same nomenclaure used in the gmt file. Not significant genes must be removed beforehand.') 
 
 parser.add_argument('--output_address', metavar='output_address', type=str,  nargs='?', default='',
                     help='TSV file name where results will be saved. Default is pathway_list name  + \'_filtered.tsv\'')
@@ -25,11 +25,11 @@ parser.add_argument('--output_address', metavar='output_address', type=str,  nar
 parser.add_argument('--to_test_threshold', type=float, default='0',
                     help='Pathway \'B\' will be tested against all pathways \'A\' that are more significant AND that the ratio of B-DEGs also found in A to B-DEGs is at least [to_test_threshold].')
 
-parser.add_argument('--pval_treshold', type=float, default='0.05',
+parser.add_argument('--pval_threshold', type=float, default='0.05',
                     help='P-value thresold to exclude a pathway. Since each pathway is treated independently, multiple testing corrections shouldn\'t be applied.')
 
 parser.add_argument('--term_size_limit', type=float, default='0',
-                    help='Ignore very large pathways largers than term_size_limit. Use this if you want to remove vague terms likes \'Cytoplasm\'.')
+                    help='Ignore very large pathways largers than term_size_limit. Use this if you want to remove vague terms likes \'Cytoplasm\'. 0 or -1 includes all pathways')
 
 parser.add_argument('--tranlator_gene_names', type=str, nargs='?', default='',
                     help='If you add a file that can translate the IDs used in gmt files to another name I can translate the genes list of each pathway. Argument are 3 comma separated strings; translator file address, colname of IDs, colname of translated names')
@@ -54,14 +54,14 @@ pathway_list = args.pathway_list
 gmt_file =  args.gmt_file
 output_address =  args.output_address
 to_test_threshold =  float(args.to_test_threshold)   #default=0.00
-pval_treshold = float(args.pval_treshold)  # to change result from "keep" to "exclude", default=0.05
+pval_threshold = float(args.pval_threshold)  # to change result from "keep" to "exclude", default=0.05
 tranlator_gene_names = args.tranlator_gene_names
 selected_gene_list = args.selected_gene_list
 term_size_limit = int(args.term_size_limit)
+top_n = int(args.top_n)
+show_excluded = not args.clean
 
 version = '3.7'
-
-### Changelog:
 #v2 I format the script neatly as a function
 #v2.1 minor comments
 #v2.4 adjusted identation, added a "filter" column to give more info on near misses
@@ -73,7 +73,7 @@ version = '3.7'
 #v2.9 deals with differences in p-value cutoffs, and splits the filter column into filter and reciprocal. Column order was rearranged
 #v3 uses from fractions import Fraction
 #v3.2 changes default to_test_threshold to 0. Fix strange case where there are p-value ties in the enriched input. Solve ties by density then number of degs
-#v3.3 accepts csv again
+#v 3.3 accepts csv again
 #v3.4 improves error messages and warnings
 #3.5 added utf-8 capabilities in windows, also added optional --selected_gene_list argument
 #3.6 adds intersection_size to output and allows for filtering input term_size
@@ -82,7 +82,6 @@ version = '3.7'
 if output_address == '':
     output_address = pathway_list + '_filtered_' +version+ '.tsv'
 
-#format numbers in a reasonable amount of decimals, use scientific notation when convenient.
 def nice_float(num, decimal_places=4, scientific_places=2, scientific_low=0.001, scientific_high=10000000):
     num = float(num)
     if num == 0:
@@ -98,9 +97,9 @@ def nice_float(num, decimal_places=4, scientific_places=2, scientific_low=0.001,
         return formatted
 
 def append_dict(dict, name, item):  # add to dictionary, if entry already exists, vector-append to it instead of replacing
-    if name not in dict:
-        dict[name] = []
-    dict[name].append(item)
+	if name not in dict:
+		dict[name] = []
+	dict[name].append(item)
 
 # This funtion is similar to panda's read_table(), but it returns a dictionary indexed by values from column dict_key. Synonyms are appended to a list.
 # This function is larger as it performs some data cleaning. # I intend to reduce it in next versions.
@@ -119,11 +118,10 @@ def read_file(address, skiprows = 0, colorder = [], minlength = 2, dict_key = 0,
         colorder_int = False
     else:
         print('Error: type([dict_key]) must be \'list\' or \'int\', is: ' + str(type([colorder])))
-
+    #
     end_of_line = 1  #will be used in an if several lines bellow.
     table = {}
-
-
+    #
     fil = io.open(address, 'r', encoding="utf-8")
     for line in fil:
         if(skiprows!= 0): #skip headers
@@ -241,18 +239,18 @@ if 'intersection_size' in input_pathways.columns:
     if 'term_size' in input_pathways.columns:
         input_pathways["ratio"] = (input_pathways["intersection_size"] / input_pathways["term_size"])
         input_pathways = input_pathways.sort_values(by='ratio', ascending=False, kind='stable')
+
 input_pathways = input_pathways.sort_values(by='p_value', ascending=True, kind='stable')  #this one is always required! Pathways will only be tested against those above them
-
-
 
 rejected_pathways = input_pathways[~input_pathways.term_id.isin(gmt_data)] #because I need to know their composition to find the intersection sizes
 if len(rejected_pathways) > 0:
     print('Warning, These pathways were not in the gmt file:\n' + '\n'.join([line for line in rejected_pathways.term_id]))
+
 approved_pathways = input_pathways[input_pathways.term_id.isin(gmt_data)]
 del input_pathways
 
 # if necessary, filter out large pathways by term_size
-if term_size_limit != 0:
+if term_size_limit > 1:
     for index, path in approved_pathways.iterrows():
         if len(gmt_data[path.term_id][0]) > term_size_limit:
             approved_pathways.drop(index, inplace=True)
@@ -319,8 +317,8 @@ for line in range(len(pathways_dictionaries)):
     pathways_dictionaries[line]['degs'] = set(pathways_dictionaries[line]['deg_list'])
     pathways_dictionaries[line]['all_genes'] = set(pathways_dictionaries[line]['all_genes'])
     pathways_dictionaries[line]['reciprocal'] = 0
-    pathways_dictionaries[line]['intersection_size'] = 0
-    pathways_dictionaries[line]['degs_in_intersection'] = 0
+    pathways_dictionaries[line]['intersection_size'] = 0       # compared to pathway in output file
+    pathways_dictionaries[line]['degs_in_intersection'] = 0    # compared to pathway in output file
 
 
 if tranlator_gene_names != '':
@@ -381,8 +379,8 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
                 size_test = len(pathways_dictionaries[test_line]['all_genes'])
                 current_result = comb_comb_comb(degs_in_current, degs_in_intersection_current, intersection_size, size_current)
                 reverse_result = comb_comb_comb(degs_in_test, degs_in_intersection_current, intersection_size, size_test)
-                if current_result < pval_treshold:
-                    if reverse_result > pval_treshold:
+                if current_result < pval_threshold:
+                    if reverse_result > pval_threshold:
                         ############################
                         # test the reciprocity rule:
                         #sometimes 2 pathways are mutually dependent, so the comb test would say that both can exclude the other. Let's only remove a pathway if the reverse wouldn't be true.
@@ -416,7 +414,7 @@ else:
 
 for line in range(0, len(pathways_dictionaries)):
     if(pathways_dictionaries[line]['filter'] != 'exclude' or show_excluded):
-        if (pathways_dictionaries[line]['reciprocal'] < pval_treshold) and (pathways_dictionaries[line]['p-value'] < pval_treshold):
+        if (pathways_dictionaries[line]['reciprocal'] < pval_threshold) and (pathways_dictionaries[line]['p-value'] < pval_threshold):
             reciprocal_final = 'True'
         else:
             reciprocal_final = 'False'
@@ -428,3 +426,5 @@ for line in range(0, len(pathways_dictionaries)):
 out_file.close()
 
 print('PathwayDenester done')
+
+
