@@ -408,9 +408,9 @@ for current_line in range(1,len(pathways_dictionaries)): #makes no sense to test
 #save results:
 out_file = io.open(output_address, 'w', encoding="utf-8")
 if top_n != 0:
-    out_file.write('Pathway id\tName\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in Intersection\tResult\tReciprocal pvalue\tFiltered\tVersus\tVersus Name\tIs Reciprocal\tTop Genes\n')
+    out_file.write('Pathway ID\tName\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in Intersection\tResult\tReciprocal pvalue\tFiltered\tVersus\tVersus Name\tIs Reciprocal\tTop Genes\n')
 else:
-    out_file.write('Pathway id\tName\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in Intersection\tResult\tReciprocal pvalue\tFiltered\tVersus\tVersus Name\tIs Reciprocal\n')
+    out_file.write('Pathway ID\tName\tpvalue\tDEG number\tDEG Density\tIntersecton size\tDEGs in Intersection\tResult\tReciprocal pvalue\tFiltered\tVersus\tVersus Name\tIs Reciprocal\n')
 
 for line in range(0, len(pathways_dictionaries)):
     if(pathways_dictionaries[line]['filter'] != 'exclude' or show_excluded):
